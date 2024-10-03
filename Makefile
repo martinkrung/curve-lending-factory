@@ -5,6 +5,9 @@ start_env:
 	source .env
 	source .venv/bin/activate
 
+clean:
+	rm -rf .venv
+
 deploy_info:
 	ape run scripts/deploy_manager.py info --network arbitrum:mainnet-fork:foundry
 
