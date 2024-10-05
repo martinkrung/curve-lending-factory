@@ -26,6 +26,7 @@ interface Vault:
     def borrowed_token() -> address: view
     def collateral_token() -> address: view
     def price_oracle() -> address: view
+    def set_max_supply(_value: uint256): nonpayable
 
 interface Controller:
     def monetary_policy() -> address: view
@@ -44,16 +45,14 @@ interface Pool:
 interface GaugeFactory:
     def get_gauge_from_lp_token(addr: address) -> address: view
 
-interface MonetaryPolicy:
-    def price_oracle(i: uint256 = 0) -> uint256: view  # Universal method!
-    def coins(i: uint256) -> address: view
 
 event SetImplementations:
     amm: address
     controller: address
     vault: address
     price_oracle: address
-    monetary_policy: address
+    monetary_policy_semilog: address
+    monetary_policy_hyperbolic: address
     gauge_factory: address
 
 event SetDefaultRates:
@@ -87,7 +86,8 @@ amm_impl: public(address)
 controller_impl: public(address)
 vault_impl: public(address)
 pool_price_oracle_impl: public(address)
-monetary_policy_impl: public(address)
+monetary_policy_semilog_impl: public(address)
+monetary_policy_hyperbolic_impl: public(address)
 
 # Actual min/max borrow rates when creating new markets
 # for example, 0.5% -> 50% is a good choice
@@ -118,7 +118,8 @@ def __init__(
         controller: address,
         vault: address,
         pool_price_oracle: address,
-        monetary_policy: address,
+        monetary_policy_semilog: address,
+        monetary_policy_hyperbolic: address,
         gauge_factory: GaugeFactory,
         admin: address):
     """
@@ -136,7 +137,8 @@ def __init__(
     self.controller_impl = controller
     self.vault_impl = vault
     self.pool_price_oracle_impl = pool_price_oracle
-    self.monetary_policy_impl = monetary_policy
+    self.monetary_policy_semilog_impl = monetary_policy_semilog
+    self.monetary_policy_hyperbolic_impl = monetary_policy_hyperbolic
     self.gauge_factory = gauge_factory
 
     self.min_default_borrow_rate = 5 * 10**15 / (365 * 86400)
@@ -155,24 +157,23 @@ def _create(
         liquidation_discount: uint256,
         price_oracle: address,
         name: String[64],
-        monetary_policy_args: DynArray[uint256, 4]
+        monetary_policy_args: DynArray[uint256, 5]
     ) -> Vault:
     """
     @notice Internal method for creation of the vault
     """
     assert borrowed_token != collateral_token, "Same token"
     assert borrowed_token == STABLECOIN or collateral_token == STABLECOIN
-
     vault: Vault = Vault(create_minimal_proxy_to(self.vault_impl))
 
-    assert len(monetary_policy_args) == 2 or len(monetary_policy_args) == 4, "Invalid monetary policy arguments length"
+    assert len(monetary_policy_args) == 2 or len(monetary_policy_args) == 5, "Invalid monetary policy arguments length"
 
     monetary_policy: address = empty(address)
-x
+
     if len(monetary_policy_args) == 2:
-        # semilog
         min_borrow_rate:  uint256 = monetary_policy_args[0]
         max_borrow_rate: uint256 = monetary_policy_args[1]
+
         min_rate: uint256 = self.min_default_borrow_rate
         max_rate: uint256 = self.max_default_borrow_rate
         if min_borrow_rate > 0:
@@ -180,18 +181,19 @@ x
         if max_borrow_rate > 0:
             max_rate = max_borrow_rate
         assert min_rate >= MIN_RATE and max_rate <= MAX_RATE and min_rate <= max_rate, "Wrong rates"
-        # self.monetary_policy_impl
         monetary_policy = create_from_blueprint(
-            self.monetary_policy_impl, borrowed_token, min_rate, max_rate, code_offset=3)
+            self.monetary_policy_semilog_impl, borrowed_token, min_rate, max_rate, code_offset=3)
 
-    elif len(monetary_policy_args) == 4:
+    elif len(monetary_policy_args) == 5:
         target_utilization: uint256 = monetary_policy_args[0] 
-        low_ratio: uint256 = monetary_policy_args[1]
-        high_ratio: uint256 = monetary_policy_args[2]
-        rate_shift: uint256 = monetary_policy_args[3]
+        target_rate: uint256 = monetary_policy_args[1]
+        low_ratio: uint256 = monetary_policy_args[2]
+        high_ratio: uint256 = monetary_policy_args[3]
+        rate_shift: uint256 = monetary_policy_args[4]
         monetary_policy = create_from_blueprint(
-            self.monetary_policy_impl, borrowed_token, target_utilization, low_ratio,  high_ratio, rate_shift, code_offset=3)
-
+            self.monetary_policy_hyperbolic_impl, borrowed_token, target_utilization, target_rate, low_ratio, high_ratio, rate_shift, code_offset=3)
+    else:
+        raise "Invalid monetary policy arguments length"
 
     controller: address = empty(address)
     amm: address = empty(address)
@@ -234,7 +236,8 @@ def create(
         liquidation_discount: uint256,
         price_oracle: address,
         name: String[64],
-        monetary_policy_args: DynArray[uint256, 4]  # Use an array for min and max borrow rates
+        monetary_policy_args: DynArray[uint256, 5],
+        supply_limit: uint256 = max_value(uint256)
     ) -> Vault:
     """
     @notice Creation of the vault using user-supplied price oracle contract
@@ -246,10 +249,18 @@ def create(
     @param liquidation_discount Liquidation discount. LT = sqrt(((A - 1) / A) ** 4) - liquidation_discount
     @param price_oracle Custom price oracle contract
     @param name Human-readable market name
-    @param monetary_policy_args Array containing min and max borrow rates, (otherwise min_default_borrow_rate and max_default_borrow_rate)
+    @param monetary_policy_args 
+        Array length 2, containing min and max borrow rates for semilog, 
+        if 0 min_default_borrow_rate and max_default_borrow_rate 
+        OR 
+        Array length 5, containing hyperbolic monetary policy arguments
+    @param supply_limit Supply cap
     """
-    return self._create(borrowed_token, collateral_token, A, fee, loan_discount, liquidation_discount,
-                        price_oracle, name, monetary_policy_args)  # Pass rates from the array
+    vault: Vault = self._create(borrowed_token, collateral_token, A, fee, loan_discount, liquidation_discount,
+                                price_oracle, name, monetary_policy_args)
+    if supply_limit < max_value(uint256):
+        vault.set_max_supply(supply_limit)
+    return vault
 
 
 @external
@@ -263,7 +274,8 @@ def create_from_pool(
         liquidation_discount: uint256,
         pool: address,
         name: String[64],
-        monetary_policy_args: DynArray[uint256, 4]  # Use an array for min and max borrow rates
+        monetary_policy_args: DynArray[uint256, 5],
+        supply_limit: uint256 = max_value(uint256)
     ) -> Vault:
     """
     @notice Creation of the vault using existing oraclized Curve pool as a price oracle
@@ -276,7 +288,12 @@ def create_from_pool(
     @param pool Curve tricrypto-ng, twocrypto-ng or stableswap-ng pool which has non-manipulatable price_oracle().
                 Must contain both collateral_token and borrowed_token.
     @param name Human-readable market name
-    @param monetary_policy_args Array containing min and max borrow rates, (otherwise min_default_borrow_rate and max_default_borrow_rate)
+    @param monetary_policy_args 
+        Array length 2, containing min and max borrow rates for semilog, 
+        if 0 min_default_borrow_rate and max_default_borrow_rate 
+        OR 
+        Array length 5, containing hyperbolic monetary policy arguments
+    @param supply_limit Supply cap
     """
     # Find coins in the pool
     borrowed_ix: uint256 = 100
@@ -302,8 +319,11 @@ def create_from_pool(
     price_oracle: address = create_from_blueprint(
         self.pool_price_oracle_impl, pool, N, borrowed_ix, collateral_ix, code_offset=3)
 
-    return self._create(borrowed_token, collateral_token, A, fee, loan_discount, liquidation_discount,
-                        price_oracle, name, monetary_policy_args)
+    vault: Vault = self._create(borrowed_token, collateral_token, A, fee, loan_discount, liquidation_discount,
+                                price_oracle, name, monetary_policy_args)
+    if supply_limit < max_value(uint256):
+        vault.set_max_supply(supply_limit)
+    return vault
 
 
 @view
@@ -359,15 +379,16 @@ def gauges(vault_id: uint256) -> address:
 @external
 @nonreentrant('lock')
 def set_implementations(controller: address, amm: address, vault: address,
-                        pool_price_oracle: address, monetary_policy: address, gauge_factory: address):
+                        pool_price_oracle: address, monetary_policy_semilog: address, monetary_policy_hyperbolic: address, gauge_factory: address):
     """
-    @notice Set new implementations (blueprints) for controller, amm, vault, pool price oracle and monetary polcy.
+    @notice Set new implementations (blueprints) for controller, amm, vault, pool price oracle and both monetary policies.
             Doesn't change existing ones
     @param controller Address of the controller blueprint
     @param amm Address of the AMM blueprint
     @param vault Address of the Vault template
     @param pool_price_oracle Address of the pool price oracle blueprint
-    @param monetary_policy Address of the monetary policy blueprint
+    @param monetary_policy_semilog Address of the semilog monetary policy blueprint
+    @param monetary_policy_hyperbolic Address of the hyperbolic monetary policy blueprint
     @param gauge_factory Address for gauge factory
     """
     assert msg.sender == self.admin
@@ -380,19 +401,21 @@ def set_implementations(controller: address, amm: address, vault: address,
         self.vault_impl = vault
     if pool_price_oracle != empty(address):
         self.pool_price_oracle_impl = pool_price_oracle
-    if monetary_policy != empty(address):
-        self.monetary_policy_impl = monetary_policy
+    if monetary_policy_semilog != empty(address):
+        self.monetary_policy_semilog_impl = monetary_policy_semilog
+    if monetary_policy_hyperbolic != empty(address):
+        self.monetary_policy_hyperbolic_impl = monetary_policy_hyperbolic
     if gauge_factory != empty(address):
         self.gauge_factory = GaugeFactory(gauge_factory)
 
-    log SetImplementations(amm, controller, vault, pool_price_oracle, monetary_policy, gauge_factory)
+    log SetImplementations(amm, controller, vault, pool_price_oracle, monetary_policy_semilog, monetary_policy_hyperbolic, gauge_factory)
 
 
 @external
 @nonreentrant('lock')
 def set_default_rates(min_rate: uint256, max_rate: uint256):
     """
-    @notice Change min and max default borrow rates for creating new markets
+    @notice for semilog: Change min and max default borrow rates for creating new markets
     @param min_rate Minimal borrow rate (0 utilization)
     @param max_rate Maxumum borrow rate (100% utilization)
     """
