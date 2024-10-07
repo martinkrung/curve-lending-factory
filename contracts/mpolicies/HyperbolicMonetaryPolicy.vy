@@ -1,6 +1,6 @@
 # @version 0.3.10
 """
-@title Secondary monetary policy
+@title Hyperbolic monetary policy
 @notice Monetary policy to calculate borrow rates in lending markets
         depending on r0 borrow rate and utilization.
 
@@ -57,10 +57,9 @@ parameters: public(Parameters)
 
 
 @external
-def __init__(factory: Factory, borrowed_token: ERC20,
+def __init__(borrowed_token: ERC20,
              target_utilization: uint256, target_rate: uint256, low_ratio: uint256, high_ratio: uint256, rate_shift: uint256):
     """
-    @param factory Factory contract
     @param borrowed_token Borrowed token in the market (e.g. crvUSD)
     @param target_utilization Utilization at which borrow rate is the same as in target_rate
     @param target_rate Rate at target_utilization
@@ -76,8 +75,9 @@ def __init__(factory: Factory, borrowed_token: ERC20,
     assert low_ratio < high_ratio
     assert rate_shift <= MAX_RATE_SHIFT
 
-    FACTORY = factory
     BORROWED_TOKEN = borrowed_token
+    FACTORY = Factory(msg.sender)
+
     p: Parameters = self.get_params(target_utilization, target_rate, low_ratio, high_ratio, rate_shift)
     self.parameters = p
     log SetParameters(p.r_0, p.u_inf, p.A, p.r_minf, p.shift)
@@ -129,27 +129,7 @@ def calculate_rate_test(u: uint256) -> uint256:
     return p.r_0 * p.r_minf / 10**18 + p.A * p.r_0 / (p.u_inf - u) + p.shift
 
 
-@external
-def set_parameters(target_utilization: uint256, target_rate: uint256, low_ratio: uint256, high_ratio: uint256, rate_shift: uint256):
-    """
-    @param target_utilization Utilization at which borrow rate is the same as in target_rate
-    @param target_rate Rate at target_utilization
-    @param low_ratio Ratio rate/target_rate at 0% utilization
-    @param high_ratio Ratio rate/target_rate at 100% utilization
-    @param rate_shift Shift all the rate curve by this rate
-    """
-    assert msg.sender == FACTORY.admin()
 
-    assert target_utilization >= MIN_UTIL
-    assert target_utilization <= MAX_UTIL
-    assert low_ratio >= MIN_LOW_RATIO
-    assert high_ratio <= MAX_HIGH_RATIO
-    assert low_ratio < high_ratio
-    assert rate_shift <= MAX_RATE_SHIFT
-
-    p: Parameters = self.get_params(target_utilization, target_rate, low_ratio, high_ratio, rate_shift)
-    self.parameters = p
-    log SetParameters(p.r_0, p.u_inf, p.A, p.r_minf, p.shift)
 
 
 @view

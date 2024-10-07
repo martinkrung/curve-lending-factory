@@ -30,4 +30,6 @@ noisy_test:
 	ape test -rP  --capture=no
 
 test:
-	ape test 
+	python tests/test-factory-deploy.py 
+	python tests/test-market-creation.py
+	python tests/test-hyperbolic.py

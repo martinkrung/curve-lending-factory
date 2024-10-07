@@ -1,6 +1,12 @@
 # About
 
 
+Hyperbolic monetary policy for llama lending based on secondary monetary policy.
+
+
+Tool to print charts for interest rate models: https://github.com/martinkrung/interest-rate-models
+
+
 ## Install
 
 ```
@@ -11,7 +17,7 @@ pip install --upgrade pip
 pip install eth-ape'[recommended-plugins]'
 pip install titanoboa==0.1.10
 ape plugins install arbitrum
-ape test
+make test
 ```
 
 ## Notes
@@ -69,4 +75,3 @@ MethodID: 0x5673683f
 7	name	string	tBTC-long2
 8	min_borrow_rate	uint256	158548960
 9	max_borrow_rate	uint256	7927447995
- 

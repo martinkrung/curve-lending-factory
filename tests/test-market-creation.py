@@ -9,19 +9,9 @@ RPC_ETHEREUM = os.getenv('RPC_ETHEREUM')
 RPC_ARBITRUM = os.getenv('RPC_ARBITRUM')
 ARBISCAN_API_KEY = os.getenv('ARBISCAN_API_KEY')
 ETHERSCAN_API_KEY = os.getenv('ETHERSCAN_API_KEY')
-DEPLOYED_CONTRACT = os.getenv('DEPLOYED_CONTRACT')
 
 boa.env.fork(RPC_ARBITRUM)
 
-
-if DEPLOYED_CONTRACT:  # Check if DEPLOYED_CONTRACT is set
-    deployed_contract = boa.from_etherscan(
-        DEPLOYED_CONTRACT,
-        name="Contract",
-        uri="https://api.arbiscan.io/api",
-        api_key=ARBISCAN_API_KEY
-    )
-    test = deployed_contract.function(arg1, arg2)
 
 # from init tx of factory
 stablecoin = "0x498Bf2B1e120FeD3ad3D42EA2165E9b73f99C1e5"
@@ -66,5 +56,6 @@ new_market_vault = local_factory.create(
     min_borrow_rate,
     max_borrow_rate
 )
+
 
 print(f"new_market_vault: {new_market_vault}")

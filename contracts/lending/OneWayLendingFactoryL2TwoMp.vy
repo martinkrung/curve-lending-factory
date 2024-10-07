@@ -128,7 +128,8 @@ def __init__(
     @param amm Address of AMM implementation
     @param controller Address of Controller implementation
     @param pool_price_oracle Address of implementation for price oracle factory (prices from pools)
-    @param monetary_policy Address for implementation of monetary policy
+    @param monetary_policy_semilog Address for implementation of semilog monetary policy
+    @param monetary_policy_hyperbolic Address for implementation of hyperbolic monetary policy
     @param gauge_factory Address for gauge factory on this L2
     @param admin Admin address (DAO)
     """
@@ -170,7 +171,9 @@ def _create(
 
     monetary_policy: address = empty(address)
 
+
     if len(monetary_policy_args) == 2:
+
         min_borrow_rate:  uint256 = monetary_policy_args[0]
         max_borrow_rate: uint256 = monetary_policy_args[1]
 
@@ -190,8 +193,8 @@ def _create(
         low_ratio: uint256 = monetary_policy_args[2]
         high_ratio: uint256 = monetary_policy_args[3]
         rate_shift: uint256 = monetary_policy_args[4]
-        monetary_policy = create_from_blueprint(
-            self.monetary_policy_hyperbolic_impl, borrowed_token, target_utilization, target_rate, low_ratio, high_ratio, rate_shift, code_offset=3)
+
+        monetary_policy = create_from_blueprint(self.monetary_policy_hyperbolic_impl, borrowed_token, target_utilization, target_rate, low_ratio, high_ratio, rate_shift, code_offset=3)
     else:
         raise "Invalid monetary policy arguments length"
 
