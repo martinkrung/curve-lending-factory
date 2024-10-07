@@ -8,7 +8,7 @@
 
             rate = r0 * (r_minf + A / (u_inf - utilization))
 
-        Depending on target utilization (u0), rate ratio at 0 (alpha) and  at max utilization (beta) one can calculate
+        Depending on target utilization (u0), rate ratio at 0 (alpha) and at max utilization (beta) one can calculate
         coefficients for the hyperbolic dependency:
 
             u_inf = (beta - 1) * u0 / ((beta - 1) * u0 - (1 - u0) * (1 - alpha))
@@ -31,14 +31,14 @@ interface Factory:
     def admin() -> address: view
 
 event SetParameters:
-    r0: uint256
+    r_0: uint256
     u_inf: uint256
     A: uint256
     r_minf: uint256
     shift: uint256
 
 struct Parameters:
-    r0: uint256
+    r_0: uint256
     u_inf: uint256
     A: uint256
     r_minf: uint256
@@ -80,18 +80,19 @@ def __init__(factory: Factory, borrowed_token: ERC20,
     BORROWED_TOKEN = borrowed_token
     p: Parameters = self.get_params(target_utilization, target_rate, low_ratio, high_ratio, rate_shift)
     self.parameters = p
-    log SetParameters(p.r0, p.u_inf, p.A, p.r_minf, p.shift)
+    log SetParameters(p.r_0, p.u_inf, p.A, p.r_minf, p.shift)
 
 
 @internal
-def get_params(u_0: uint256, r0: uint256, alpha: uint256, beta: uint256, rate_shift: uint256) -> Parameters:
+def get_params(u_0: uint256, r_0: uint256, alpha: uint256, beta: uint256, rate_shift: uint256) -> Parameters:
     p: Parameters = empty(Parameters)
-    p.r0 = r0
+    p.r_0 = r_0
     p.u_inf = (beta - 10**18) * u_0 / (((beta - 10**18) * u_0 - (10**18 - u_0) * (10**18 - alpha)) / 10**18)
     p.A = (10**18 - alpha) * p.u_inf / 10**18 * (p.u_inf - u_0) / u_0
     p.r_minf = alpha - p.A * 10**18 / p.u_inf
     p.shift = rate_shift
     return p
+   
 
 
 @internal
@@ -108,7 +109,7 @@ def calculate_rate(_for: address, d_reserves: int256, d_debt: int256) -> uint256
     if total_reserves > 0:
         u = convert(total_debt * 10**18  / total_reserves, uint256)
 
-    return p.r0 * p.r_minf / 10**18 + p.A * p.r0 / (p.u_inf - u) + p.shift
+    return p.r_0 * p.r_minf / 10**18 + p.A * p.r_0 / (p.u_inf - u) + p.shift
 
 
 @view
@@ -120,6 +121,12 @@ def rate(_for: address = msg.sender) -> uint256:
 @external
 def rate_write(_for: address = msg.sender) -> uint256:
     return self.calculate_rate(_for, 0, 0)
+
+@external
+@view
+def calculate_rate_test(u: uint256) -> uint256:
+    p: Parameters = self.parameters
+    return p.r_0 * p.r_minf / 10**18 + p.A * p.r_0 / (p.u_inf - u) + p.shift
 
 
 @external
@@ -142,7 +149,7 @@ def set_parameters(target_utilization: uint256, target_rate: uint256, low_ratio:
 
     p: Parameters = self.get_params(target_utilization, target_rate, low_ratio, high_ratio, rate_shift)
     self.parameters = p
-    log SetParameters(p.r0, p.u_inf, p.A, p.r_minf, p.shift)
+    log SetParameters(p.r_0, p.u_inf, p.A, p.r_minf, p.shift)
 
 
 @view

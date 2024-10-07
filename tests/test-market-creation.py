@@ -14,26 +14,6 @@ DEPLOYED_CONTRACT = os.getenv('DEPLOYED_CONTRACT')
 boa.env.fork(RPC_ARBITRUM)
 
 
-class CreateTracer:
-    def __init__(self, super_fn):
-        """Track addresses of contracts created via the CREATE opcode.
-
-        Parameters:
-            super_fn: The original opcode implementation.
-        """
-        self.super_fn = super_fn
-        self.trace = []
-
-    def __call__(self, computation):
-        # first, dispatch to the original opcode implementation provided by py-evm
-        self.super_fn(computation)
-        # then, store the output of the CREATE opcode in our `trace` list for later
-        self.trace.append("0x" + computation._stack.values[-1][-1].hex())
-
-#create_tracer = CreateTracer(boa.env.evm.state.computation_class.opcodes[0xf0])
-#boa.patch_opcode(0xf0, create_tracer)
-#print(create_tracer.trace)
-
 if DEPLOYED_CONTRACT:  # Check if DEPLOYED_CONTRACT is set
     deployed_contract = boa.from_etherscan(
         DEPLOYED_CONTRACT,
@@ -88,41 +68,3 @@ new_market_vault = local_factory.create(
 )
 
 print(f"new_market_vault: {new_market_vault}")
-
-local_factory_dynamic = boa.load("contracts/lending/OneWayLendingFactoryL2Dynamic.vy", stablecoin, amm, controller, vault, pool_price_oracle, monetary_policy, gauge_factory, admin)
-
-#local_semilog = boa.load("contracts/mpolicies/SemilogMonetaryPolicyDynamic.vy", borrowed_token, [min_borrow_rate, max_borrow_rate])
-
-
-new_market_vault_dynamic = local_factory_dynamic.create(
-    borrowed_token,
-    collateral_token,
-    A,
-    fee,
-    loan_discount,
-    liquidation_discount,
-    price_oracle,
-    name,
-    [min_borrow_rate, max_borrow_rate]
-)
-
-
-monetary_policy_address = local_factory_dynamic.monetary_policies(0)
-
-print(f"monetary_policy_address: {monetary_policy_address}")
-
-monetary_policy = boa.load(monetary_policy_address)
-
-print(f"monetary_policy.min_rate(): {monetary_policy.min_rate()}")
-print(f"monetary_policy.max_rate(): {monetary_policy.max_rate()}")
-
-print(f"local_factory_dynamic.monetary_policies(0): {local_factory_dynamic.monetary_policies(0)}")
-
-print(f"new_market_vault_dynamic: {new_market_vault_dynamic}")
-
-
-
-#with boa.env.prank(CONTROLLER_ADDRESS):
- #   rate = rate * 365 * 86400
-  #  print(f"rate: {rate}")
-   # print(f"rate: {rate / 10**18}")
