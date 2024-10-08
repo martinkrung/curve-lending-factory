@@ -42,7 +42,7 @@ print(f"hyperbolic.parameters(): [r_0, u_inf, A, r_minf, shift]")
 
 for u in range(0, 1000000000000000001, 10000000000000000):
     # print(f"U hyperbolic.calculate_rate_test({u}): {hyperbolic.calculate_rate_test(u)}")
-    print(f"utilization: ({u/10**18}): rate {hyperbolic.calculate_rate_test(u)/10**10}")
+    print(f"util: {u/10**18}: rate {hyperbolic.calculate_rate_test(u)/10**10}")
 
 '''
 from https://lend.curve.fi/#/ethereum/markets/one-way-market-9/ 
@@ -84,7 +84,7 @@ print(f"hyperbolic.parameters(): [r_0, u_inf, A, r_minf, shift]")
 
 for u in range(0, 1000000000000000001, 10000000000000000):
     # print(f"hyperbolic.calculate_rate_test({u}): {hyperbolic.calculate_rate_test(u)}")
-    print(f"utilization: ({u/10**18}): rate {hyperbolic.calculate_rate_test(u)/10**10}")
+    print(f"util: {u/10**18}: rate {hyperbolic.calculate_rate_test(u)/10**10}")
 
 
 # at 85% utilization, rate should be 39%

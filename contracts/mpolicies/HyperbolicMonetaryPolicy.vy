@@ -49,8 +49,8 @@ MAX_UTIL: constant(uint256)  = 99 * 10**16
 MIN_LOW_RATIO: constant(uint256)  = 10**16
 MAX_HIGH_RATIO: constant(uint256) = 100 * 10**18
 MAX_RATE_SHIFT: constant(uint256) = 100 * 10**18
-MAX_TARGET_RATE: constant(uint256) = 100 * 10**10
-MIN_TARGET_RATE: constant(uint256) = 1 * 10**10
+MAX_TARGET_RATE: constant(uint256) = 10**10
+MIN_TARGET_RATE: constant(uint256) = 10**8
 
 BORROWED_TOKEN: public(immutable(ERC20))
 FACTORY: public(immutable(Factory))
